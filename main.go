@@ -24,11 +24,13 @@ func main() {
 	if token == "" {
 		log.Fatal("TELEGRAM_BOT_TOKEN environment variable is not set")
 	}
-
 	webhookURL := os.Getenv("WEBHOOK_URL")
-
 	if webhookURL == "" {
-		log.Fatal("WEBHOOK_URL environment variable is not set")
+		host := os.Getenv("RENDER_EXTERNAL_HOSTING")
+		if host == "" {
+			log.Fatal("WEBHOOK_URL or RENDER_EXTERNAL_HOSTNAME is not set ")
+		}
+		webhookURL = "https://" + host
 	}
 
 	port := os.Getenv("PORT")
