@@ -26,11 +26,12 @@ func main() {
 	}
 	webhookURL := os.Getenv("WEBHOOK_URL")
 	if webhookURL == "" {
-		host := os.Getenv("RENDER_EXTERNAL_HOSTING")
-		if host == "" {
-			log.Fatal("WEBHOOK_URL or RENDER_EXTERNAL_HOSTNAME is not set ")
+		webhookURL = os.Getenv("RENDER_EXTERNAL_URL")
+		if webhookURL == "" {
+			if host := os.Getenv("RENDER_EXTERNAL_HOSTNAME"); host != "" {
+				webhookURL = "https://" + host
+			}
 		}
-		webhookURL = "https://" + host
 	}
 
 	port := os.Getenv("PORT")
@@ -92,21 +93,20 @@ func main() {
 	)
 	webhookPath := "/" + token
 
-	webhook, err := tgbotapi.NewWebhook(
-		webhookURL + webhookPath,
-	)
-
-	if err != nil {
-		log.Fatal("Error creating webhook:", err)
+	if webhookURL != "" {
+		webhook, err := tgbotapi.NewWebhook(webhookURL + webhookPath)
+		if err != nil {
+			log.Fatal("error in creating", err)
+		}
+		_, err = bot.Request(webhook)
+		if err != nil {
+			log.Fatal("error in setting", err)
+		}
+		log.Println("webhook setsuccesfully:")
+		log.Println(webhookURL + webhookPath)
+	} else {
+		log.Println("webhook is not set yet :")
 	}
-	_, err = bot.Request(webhook)
-
-	if err != nil {
-		log.Fatal("Error setting webhook:", err)
-	}
-
-	log.Println("Webhook set successfully:")
-	log.Println(webhookURL + webhookPath)
 
 	info, err := bot.GetWebhookInfo()
 
