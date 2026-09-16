@@ -2,6 +2,7 @@ package main
 
 import (
 	"log"
+	"net/http"
 	"os"
 
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
@@ -17,78 +18,198 @@ type About struct {
 }
 
 func main() {
-	err := godotenv.Load("token.env")
-	if err != nil {
-		log.Fatal("error happenne")
-	}
+	_ = godotenv.Load("token.env")
 	token := os.Getenv("TELEGRAM_BOT_TOKEN")
+
 	if token == "" {
 		log.Fatal("TELEGRAM_BOT_TOKEN environment variable is not set")
 	}
 
-	// insertin datas in struct
-	Data := About{
-		Skills:     []string{"Python\t", "Golang\n", "Mysql\t", "Sql server", "c++\n"}, //skil haro bishtar kon to switch
-		Educations: []string{"B.Sc . computer engineering at Azad university of tabriz\n"},
-		GPA:        []string{"bachelor(untill now):16.31", "Diploma: 17.62"},
-		Projects:   []string{"pharmacy manegment system : used language: c++\n", "Taskmanager : used language: Golang\n", "Student managment real life database : used skill : Mysql\n"},
-		Info:       []string{"Email: amirsepehr265@gmail.com", " -- ", "Whatsapp: +989148884564"},
+	webhookURL := os.Getenv("WEBHOOK_URL")
+
+	if webhookURL == "" {
+		log.Fatal("WEBHOOK_URL environment variable is not set")
 	}
 
-	keboard := tgbotapi.NewReplyKeyboard(tgbotapi.NewKeyboardButtonRow(tgbotapi.NewKeyboardButton("Skills")), tgbotapi.NewKeyboardButtonRow(tgbotapi.NewKeyboardButton("Educations")),
-		tgbotapi.NewKeyboardButtonRow(tgbotapi.NewKeyboardButton("Gpa")), tgbotapi.NewKeyboardButtonRow(tgbotapi.NewKeyboardButton("Projects")),
-		tgbotapi.NewKeyboardButtonRow(tgbotapi.NewKeyboardButton("Contact")))
-	bot, err := tgbotapi.NewBotAPI(token)
-	if err != nil {
-		log.Fatal(err)
+	port := os.Getenv("PORT")
+
+	if port == "" {
+		port = "10000"
 	}
-	log.Println("authorized on", bot.Self.UserName)
-	u := tgbotapi.NewUpdate(0)
-	u.Timeout = 60
-	updates := bot.GetUpdatesChan(u)
+	bot, err := tgbotapi.NewBotAPI(token)
+
+	if err != nil {
+		log.Fatal("Error creating bot:", err)
+	}
+
+	log.Println("Authorized on account:", bot.Self.UserName)
+	about := About{
+		Skills: []string{
+			"Python",
+			"Golang",
+			"Mysql",
+			"Sql server",
+			"c++",
+		},
+
+		Educations: []string{
+			"B.Sc . computer engineering at Azad university of tabriz",
+		},
+
+		GPA: []string{
+			"bachelor(untill now):16.31",
+			"Diploma: 17.62",
+		},
+
+		Projects: []string{
+			"pharmacy manegment system : used language: c++",
+			"Taskmanager : used language: Golang",
+			"Student managment real life database : used skill : Mysql",
+		},
+
+		Info: []string{
+			"Email: amirsepehr265@gmail.com",
+			"--",
+			"Whatsapp: +989148884564",
+		},
+	}
+	keyboard := tgbotapi.NewReplyKeyboard(
+		tgbotapi.NewKeyboardButtonRow(
+			tgbotapi.NewKeyboardButton("Skills"),
+			tgbotapi.NewKeyboardButton("Educations"),
+		),
+
+		tgbotapi.NewKeyboardButtonRow(
+			tgbotapi.NewKeyboardButton("Gpa"),
+			tgbotapi.NewKeyboardButton("Projects"),
+		),
+
+		tgbotapi.NewKeyboardButtonRow(
+			tgbotapi.NewKeyboardButton("Contact"),
+		),
+	)
+	webhookPath := "/" + token
+
+	webhook, err := tgbotapi.NewWebhook(
+		webhookURL + webhookPath,
+	)
+
+	if err != nil {
+		log.Fatal("Error creating webhook:", err)
+	}
+	_, err = bot.Request(webhook)
+
+	if err != nil {
+		log.Fatal("Error setting webhook:", err)
+	}
+
+	log.Println("Webhook set successfully:")
+	log.Println(webhookURL + webhookPath)
+
+	info, err := bot.GetWebhookInfo()
+
+	if err != nil {
+		log.Println("Could not get webhook information:", err)
+	} else {
+		log.Println("Telegram Webhook URL:", info.URL)
+
+		if info.LastErrorDate != 0 {
+			log.Println("Telegram Webhook Error:", info.LastErrorMessage)
+		}
+	}
+	updates := bot.ListenForWebhook(webhookPath)
+
+	go func() {
+
+		log.Println("HTTP server running on port:", port)
+
+		err := http.ListenAndServe(
+			"0.0.0.0:"+port,
+			nil,
+		)
+
+		if err != nil {
+			log.Fatal("HTTP server error:", err)
+		}
+	}()
+
 	for update := range updates {
+
 		if update.Message == nil {
 			continue
 		}
-		message := tgbotapi.NewMessage(update.Message.Chat.ID, "")
-		message.ReplyMarkup = keboard
+
+		log.Printf(
+			"[%s] %s",
+			update.Message.From.UserName,
+			update.Message.Text,
+		)
+
+		var response string
+
 		switch update.Message.Text {
+
+		case "/start":
+
+			response = "Welcome to my portfolio bot! 👋"
+
 		case "Skills":
-			responseText := "🧤 Skills that i have currently 🧤\n"
-			for _, skills := range Data.Skills {
-				responseText += "-" + skills
+
+			response = "Skills:\n"
+
+			for _, skill := range about.Skills {
+				response += "• " + skill + "\n"
 			}
-			message.Text = responseText
-		case "Gpa":
-			responseText := "◻ All my Grades currently ◻:"
-			for _, gpa := range Data.GPA {
-				responseText += "--" + gpa
-			}
-			message.Text = responseText
-		case "Contact":
-			responseText := "☎ Contact info ☎:"
-			for _, contact := range Data.Info {
-				responseText += " - " + contact
-			}
-			message.Text = responseText
+
 		case "Educations":
-			responseText := " 👨‍🎓 My degrees 👨‍🎓 :"
-			for _, edu := range Data.Educations {
-				responseText += " -- " + edu
+
+			response = "Education:\n"
+
+			for _, education := range about.Educations {
+				response += "• " + education + "\n"
 			}
-			message.Text = responseText
+
+		case "Gpa":
+
+			response = "GPA:\n"
+
+			for _, gpa := range about.GPA {
+				response += "• " + gpa + "\n"
+			}
+
 		case "Projects":
-			responseText := " 👨‍💻 Here are the projects that i've done :"
-			for _, pro := range Data.Projects {
-				responseText += "-" + pro
+
+			response = "Projects:\n"
+
+			for _, project := range about.Projects {
+				response += "• " + project + "\n"
 			}
-			message.Text = responseText
+
+		case "Contact":
+
+			response = "Contact Information:\n"
+
+			for _, info := range about.Info {
+				response += info + "\n"
+			}
+
 		default:
-			message.Text = "choose one of the options below "
-		}
-		if _, err := bot.Send(message); err != nil {
-			log.Println("error in sending !!!", err)
+
+			response = "Please choose one of the options below."
+
 		}
 
+		message := tgbotapi.NewMessage(
+			update.Message.Chat.ID,
+			response,
+		)
+
+		message.ReplyMarkup = keyboard
+
+		_, err := bot.Send(message)
+
+		if err != nil {
+			log.Println("Error sending message:", err)
+		}
 	}
 }
